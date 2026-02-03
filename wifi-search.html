@@ -1,0 +1,598 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Network Mapper - Interactive Map</title>
+    
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        #map {
+            width: 100%;
+            height: 100%;
+        }
+
+        .control-panel {
+            position: absolute;
+            top: 20px;
+            left: 60px;
+            z-index: 1000;
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 5px 20px rgba(0, 0, 0, 0.3);
+            padding: 20px;
+            min-width: 350px;
+            max-width: 400px;
+        }
+
+        .control-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            padding-bottom: 15px;
+            border-bottom: 2px solid #eee;
+        }
+
+        .control-header h2 {
+            color: #667eea;
+            font-size: 1.5em;
+        }
+
+        .close-btn {
+            background: none;
+            border: none;
+            font-size: 1.5em;
+            cursor: pointer;
+            color: #999;
+            transition: color 0.3s;
+        }
+
+        .close-btn:hover {
+            color: #667eea;
+        }
+
+        .search-section {
+            margin-bottom: 20px;
+        }
+
+        .search-section label {
+            display: block;
+            margin-bottom: 8px;
+            color: #333;
+            font-weight: 600;
+        }
+
+        .input-group {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+
+        input[type="text"],
+        input[type="number"],
+        select {
+            flex: 1;
+            padding: 12px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 14px;
+            transition: border-color 0.3s;
+        }
+
+        input:focus,
+        select:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .btn {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 600;
+            transition: all 0.3s ease;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            width: 100%;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+        }
+
+        .btn-secondary {
+            background: #f0f0f0;
+            color: #333;
+        }
+
+        .btn-secondary:hover {
+            background: #e0e0e0;
+        }
+
+        .mode-selector {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+
+        .mode-btn {
+            flex: 1;
+            padding: 10px;
+            border: 2px solid #e0e0e0;
+            background: white;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: all 0.3s;
+        }
+
+        .mode-btn.active {
+            background: #667eea;
+            color: white;
+            border-color: #667eea;
+        }
+
+        .stats-panel {
+            background: #f8f9fa;
+            border-radius: 10px;
+            padding: 15px;
+            margin-top: 15px;
+        }
+
+        .stat-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 8px 0;
+            border-bottom: 1px solid #e0e0e0;
+        }
+
+        .stat-row:last-child {
+            border-bottom: none;
+        }
+
+        .stat-label {
+            color: #666;
+            font-size: 14px;
+        }
+
+        .stat-value {
+            color: #333;
+            font-weight: 600;
+            font-size: 14px;
+        }
+
+        .loading {
+            display: none;
+            text-align: center;
+            padding: 15px;
+            color: #667eea;
+        }
+
+        .loading.active {
+            display: block;
+        }
+
+        .spinner {
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #667eea;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 10px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .legend {
+            position: absolute;
+            bottom: 30px;
+            left: 60px;
+            z-index: 1000;
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
+            padding: 15px;
+        }
+
+        .legend h3 {
+            margin-bottom: 10px;
+            color: #333;
+            font-size: 14px;
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 8px;
+            font-size: 13px;
+        }
+
+        .legend-icon {
+            font-size: 1.5em;
+        }
+
+        /* Custom marker styles */
+        .custom-marker {
+            background: none;
+            border: none;
+        }
+
+        .marker-content {
+            font-size: 24px;
+            text-shadow: 0 0 3px rgba(0, 0, 0, 0.5);
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .control-panel {
+                left: 10px;
+                right: 10px;
+                min-width: auto;
+                max-width: none;
+            }
+
+            .legend {
+                left: 10px;
+                right: 10px;
+            }
+        }
+
+        .error-message {
+            background: #ffe0e0;
+            border: 1px solid #ffcccc;
+            color: #cc0000;
+            padding: 12px;
+            border-radius: 8px;
+            margin-top: 10px;
+            font-size: 14px;
+        }
+
+        .success-message {
+            background: #e0ffe0;
+            border: 1px solid #ccffcc;
+            color: #008000;
+            padding: 12px;
+            border-radius: 8px;
+            margin-top: 10px;
+            font-size: 14px;
+        }
+    </style>
+</head>
+<body>
+    <!-- Map Container -->
+    <div id="map"></div>
+
+    <!-- Control Panel -->
+    <div class="control-panel">
+        <div class="control-header">
+            <h2>🗺️ Network Mapper</h2>
+            <button class="close-btn" onclick="togglePanel()" title="Minimizar">−</button>
+        </div>
+
+        <div class="search-section">
+            <label>Modo de Búsqueda</label>
+            <div class="mode-selector">
+                <button class="mode-btn active" data-mode="wifi" onclick="selectMode('wifi')">📡 WiFi</button>
+                <button class="mode-btn" data-mode="bluetooth" onclick="selectMode('bluetooth')">📶 Bluetooth</button>
+                <button class="mode-btn" data-mode="all" onclick="selectMode('all')">🌐 Todo</button>
+            </div>
+
+            <label>Coordenadas</label>
+            <div class="input-group">
+                <input type="number" id="lat" placeholder="Latitud" step="any" value="18.4861">
+                <input type="number" id="lon" placeholder="Longitud" step="any" value="-69.9312">
+            </div>
+
+            <label>Radio de Búsqueda</label>
+            <div class="input-group">
+                <select id="radius">
+                    <option value="0.005">~500m</option>
+                    <option value="0.01" selected>~1km</option>
+                    <option value="0.02">~2km</option>
+                    <option value="0.05">~5km</option>
+                </select>
+            </div>
+
+            <button class="btn btn-primary" onclick="searchDevices()">
+                🔍 Buscar Dispositivos
+            </button>
+
+            <button class="btn btn-secondary" onclick="useMyLocation()" style="margin-top: 10px; width: 100%;">
+                📍 Usar Mi Ubicación
+            </button>
+        </div>
+
+        <div class="loading" id="loading">
+            <div class="spinner"></div>
+            <p>Buscando dispositivos...</p>
+        </div>
+
+        <div class="stats-panel" id="stats" style="display: none;">
+            <h3 style="margin-bottom: 10px; color: #667eea;">📊 Estadísticas</h3>
+            <div class="stat-row">
+                <span class="stat-label">Dispositivos encontrados:</span>
+                <span class="stat-value" id="device-count">0</span>
+            </div>
+            <div class="stat-row">
+                <span class="stat-label">Routers WiFi:</span>
+                <span class="stat-value" id="router-count">0</span>
+            </div>
+            <div class="stat-row">
+                <span class="stat-label">Bluetooth:</span>
+                <span class="stat-value" id="bluetooth-count">0</span>
+            </div>
+            <div class="stat-row">
+                <span class="stat-label">Torres celulares:</span>
+                <span class="stat-value" id="tower-count">0</span>
+            </div>
+        </div>
+
+        <div id="message"></div>
+    </div>
+
+    <!-- Legend -->
+    <div class="legend">
+        <h3>🎯 Leyenda</h3>
+        <div class="legend-item">
+            <span class="legend-icon">📡</span>
+            <span>Router WiFi</span>
+        </div>
+        <div class="legend-item">
+            <span class="legend-icon">🚗</span>
+            <span>Vehículo</span>
+        </div>
+        <div class="legend-item">
+            <span class="legend-icon">📺</span>
+            <span>Televisor</span>
+        </div>
+        <div class="legend-item">
+            <span class="legend-icon">📷</span>
+            <span>Cámara</span>
+        </div>
+        <div class="legend-item">
+            <span class="legend-icon">🗼</span>
+            <span>Torre Celular</span>
+        </div>
+        <div class="legend-item">
+            <span class="legend-icon">📶</span>
+            <span>Bluetooth</span>
+        </div>
+    </div>
+
+    <!-- Leaflet JS -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+    <script>
+        // Initialize map
+        let map = L.map('map').setView([18.4861, -69.9312], 13);
+        let markers = [];
+        let currentMode = 'wifi';
+
+        // Add tile layer
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '© OpenStreetMap contributors',
+            maxZoom: 19
+        }).addTo(map);
+
+        // Custom icon function
+        function createCustomIcon(emoji) {
+            return L.divIcon({
+                className: 'custom-marker',
+                html: `<div class="marker-content">${emoji}</div>`,
+                iconSize: [30, 30],
+                iconAnchor: [15, 15]
+            });
+        }
+
+        // Get icon based on device type
+        function getDeviceIcon(type) {
+            const icons = {
+                'router': '📡',
+                'car': '🚗',
+                'tv': '📺',
+                'headphone': '🎧',
+                'dashcam': '📹',
+                'camera': '📷',
+                'iot': '💡',
+                'cell_tower': '🗼',
+                'bluetooth': '📶',
+                'unknown': '❓'
+            };
+            return icons[type] || icons.unknown;
+        }
+
+        // Select mode
+        function selectMode(mode) {
+            currentMode = mode;
+            document.querySelectorAll('.mode-btn').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            document.querySelector(`[data-mode="${mode}"]`).classList.add('active');
+        }
+
+        // Use my location
+        function useMyLocation() {
+            if (navigator.geolocation) {
+                showMessage('Obteniendo tu ubicación...', 'info');
+                navigator.geolocation.getCurrentPosition(
+                    (position) => {
+                        const lat = position.coords.latitude;
+                        const lon = position.coords.longitude;
+                        document.getElementById('lat').value = lat;
+                        document.getElementById('lon').value = lon;
+                        map.setView([lat, lon], 15);
+                        showMessage('✓ Ubicación obtenida', 'success');
+                    },
+                    (error) => {
+                        showMessage('Error obteniendo ubicación: ' + error.message, 'error');
+                    }
+                );
+            } else {
+                showMessage('Geolocalización no soportada en este navegador', 'error');
+            }
+        }
+
+        // Clear markers
+        function clearMarkers() {
+            markers.forEach(marker => map.removeLayer(marker));
+            markers = [];
+        }
+
+        // Search devices
+        async function searchDevices() {
+            const lat = parseFloat(document.getElementById('lat').value);
+            const lon = parseFloat(document.getElementById('lon').value);
+            const radius = parseFloat(document.getElementById('radius').value);
+
+            if (isNaN(lat) || isNaN(lon)) {
+                showMessage('Por favor ingresa coordenadas válidas', 'error');
+                return;
+            }
+
+            // Show loading
+            document.getElementById('loading').classList.add('active');
+            document.getElementById('message').innerHTML = '';
+            clearMarkers();
+
+            try {
+                const response = await fetch(`/api/nearby?lat=${lat}&lon=${lon}&mode=${currentMode}&radius=${radius}`);
+                const data = await response.json();
+
+                if (data.status === 'success') {
+                    displayDevices(data.devices);
+                    updateStats(data.devices);
+                    map.setView([lat, lon], 14);
+                    showMessage(`✓ ${data.count} dispositivos encontrados`, 'success');
+                } else {
+                    showMessage('Error: ' + data.error, 'error');
+                }
+            } catch (error) {
+                showMessage('Error de conexión: ' + error.message, 'error');
+            } finally {
+                document.getElementById('loading').classList.remove('active');
+            }
+        }
+
+        // Display devices on map
+        function displayDevices(devices) {
+            clearMarkers();
+
+            devices.forEach(device => {
+                if (device.lat && device.lon) {
+                    const icon = createCustomIcon(getDeviceIcon(device.device_type));
+                    
+                    const popupContent = `
+                        <div style="font-family: Arial, sans-serif;">
+                            <h3 style="margin: 0 0 10px 0; color: #667eea;">
+                                ${getDeviceIcon(device.device_type)} ${device.device_type.replace('_', ' ').toUpperCase()}
+                            </h3>
+                            ${device.ssid ? `<p><strong>SSID:</strong> ${device.ssid}</p>` : ''}
+                            ${device.bssid ? `<p><strong>BSSID:</strong> ${device.bssid}</p>` : ''}
+                            ${device.vendor ? `<p><strong>Vendor:</strong> ${device.vendor}</p>` : ''}
+                            ${device.signal ? `<p><strong>Señal:</strong> ${device.signal} dBm</p>` : ''}
+                            ${device.cell_id ? `<p><strong>Cell ID:</strong> ${device.cell_id}</p>` : ''}
+                            ${device.ip ? `<p><strong>IP:</strong> ${device.ip}</p>` : ''}
+                            <p style="font-size: 0.8em; color: #666; margin-top: 10px;">
+                                📍 ${device.lat.toFixed(6)}, ${device.lon.toFixed(6)}
+                            </p>
+                        </div>
+                    `;
+
+                    const marker = L.marker([device.lat, device.lon], { icon: icon })
+                        .bindPopup(popupContent)
+                        .addTo(map);
+                    
+                    markers.push(marker);
+                }
+            });
+        }
+
+        // Update statistics
+        function updateStats(devices) {
+            const stats = {
+                total: devices.length,
+                router: 0,
+                bluetooth: 0,
+                tower: 0
+            };
+
+            devices.forEach(device => {
+                if (device.device_type === 'router') stats.router++;
+                else if (device.device_type === 'bluetooth') stats.bluetooth++;
+                else if (device.device_type === 'cell_tower') stats.tower++;
+            });
+
+            document.getElementById('device-count').textContent = stats.total;
+            document.getElementById('router-count').textContent = stats.router;
+            document.getElementById('bluetooth-count').textContent = stats.bluetooth;
+            document.getElementById('tower-count').textContent = stats.tower;
+            document.getElementById('stats').style.display = 'block';
+        }
+
+        // Show message
+        function showMessage(message, type) {
+            const messageDiv = document.getElementById('message');
+            const className = type === 'error' ? 'error-message' : 'success-message';
+            messageDiv.innerHTML = `<div class="${className}">${message}</div>`;
+            
+            setTimeout(() => {
+                messageDiv.innerHTML = '';
+            }, 5000);
+        }
+
+        // Toggle panel
+        function togglePanel() {
+            const panel = document.querySelector('.control-panel');
+            const btn = document.querySelector('.close-btn');
+            
+            if (panel.style.width === '60px') {
+                panel.style.width = '';
+                panel.style.minWidth = '350px';
+                btn.textContent = '−';
+            } else {
+                panel.style.width = '60px';
+                panel.style.minWidth = '60px';
+                btn.textContent = '+';
+            }
+        }
+
+        // Map click handler
+        map.on('click', function(e) {
+            document.getElementById('lat').value = e.latlng.lat.toFixed(6);
+            document.getElementById('lon').value = e.latlng.lng.toFixed(6);
+        });
+
+        // Load devices on page load
+        window.addEventListener('load', function() {
+            // Optional: Auto-search on load
+            // searchDevices();
+        });
+    </script>
+</body>
+</html>
